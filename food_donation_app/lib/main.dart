@@ -1,125 +1,420 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
-void main() {
-  runApp(const MyApp());
-}
+import 'package:flutter/material.dart';
+import 'package:food_donation_app/donor/donor.dart';
+import 'package:food_donation_app/organization/organization.dart';
+import 'member/member.dart';
+import 'package:http/http.dart' as http;
+import 'dart:io';
+
+void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key}) : super(key: key);
 
-  // This widget is the root of your application.
+  static const String _title = 'Donate Food'; // App title
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: _title,
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a blue toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+          // Theme for the app
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange)),
+      home: const Scaffold(
+        body: LoginPage(),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class LoginPage extends StatefulWidget {
+  const LoginPage({Key? key}) : super(key: key);
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _LoginPageState extends State<LoginPage> {
+  final String hosturl = '10.0.2.2:8000'; // Server url
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  TextEditingController nameController = TextEditingController(); // Username
+  TextEditingController passwordController =
+      TextEditingController(); // Password
+
+  // Username password combination hardcoded for testing
+  Map<String, String> passwordMap = {
+    "user1": "12,34,56",
+    "user2": "12,34,56",
+    "user3": "12,34,56",
+  };
+  Map<String, String> tokenMap = {
+    "user1": "token1",
+    "user2": "donor1",
+    "user3": "member1",
+  };
+  Map<String, int> typeMap = {
+    "user1": 1,
+    "user2": 2,
+    "user3": 3,
+  };
+
+  // Validate username and password
+  bool validate(String username, String password) {
+    if (passwordMap.containsKey(username) == false) {
+      return false;
+    } else if (passwordMap[username] == password) {
+      return true;
+    }
+    return false;
+  }
+
+  // Get token from username
+  String getToken(String username) {
+    return tokenMap[username]!;
+  }
+
+  // Laod the organization if not already loaded
+  Future<http.Response> addOrgToServer(String token) async {
+    return http.post(
+      Uri.parse(Platform.isAndroid
+          ? 'http://$hosturl/add_organization/'
+          : 'http://$hosturl/add_organization/'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Authorization': 'Bearer $token',
+      },
+    );
+  }
+
+  // Laod the donor if not already loaded
+  Future<http.Response> addDonToServer(String token) async {
+    return http.post(
+      Uri.parse(Platform.isAndroid
+          ? 'http://$hosturl/add_donor/'
+          : 'http://$hosturl/add_donor/'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Authorization': 'Bearer $token',
+      },
+    );
+  }
+
+  // Laod the member if not already loaded
+  Future<http.Response> addMemToServer(String token) async {
+    return http.post(
+      Uri.parse(Platform.isAndroid
+          ? 'http://$hosturl/load_member/'
+          : 'http://$hosturl/load_member/'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Authorization': 'Bearer $token',
+      },
+    );
+  }
+
+  // Send usernam and password to server and recieve token
+  Future<http.Response> getTokenFromServer(
+      String username, String password) async {
+    return http.post(
+      Uri.parse(Platform.isAndroid
+          ? 'http://$hosturl/token/?username=$username&password=$password'
+          : 'http://$hosturl/token/?username=$username&password=$password'),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    return SafeArea(
+      child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            children: [
+              Container(
+                alignment: Alignment.center,
+                padding: const EdgeInsets.all(10),
+                child: const Text(
+                  'Login',
+                  style: TextStyle(fontSize: 30),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(10),
+                child: SizedBox(
+                  width: 400,
+                  child: TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'User Name',
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+                child: SizedBox(
+                  width: 400,
+                  child: TextField(
+                    obscureText: true,
+                    controller: passwordController,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Password',
+                    ),
+                  ),
+                ),
+              ),
+              // Space between login button and password field
+              Container(
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+              ),
+              Container(
+                height: 50,
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 0),
+                child: ElevatedButton(
+                    child: const Text('Login'),
+                    onPressed: () {
+                      // Handle login
+                      if (validate(
+                          nameController.text, passwordController.text)) {
+                        if (typeMap[nameController.text] == 1) {
+                          addOrgToServer(getToken(nameController.text));
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => OrganizationApp(
+                                        token: getToken(nameController.text),
+                                        hosturl: hosturl,
+                                      )));
+                        } else if (typeMap[nameController.text] == 2) {
+                          addDonToServer(getToken(nameController.text));
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => DonorApp(
+                                        token: getToken(nameController.text),
+                                        hosturl: hosturl,
+                                      )));
+                        } else if (typeMap[nameController.text] == 3) {
+                          addMemToServer(getToken(nameController.text));
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) => MemberApp(
+                                        token: getToken(nameController.text),
+                                        hosturl: hosturl,
+                                      )));
+                        }
+                      } else {
+                        // if token recieved from sserver
+                        getTokenFromServer(
+                                nameController.text, passwordController.text)
+                            .then((value) {
+                          if (value.statusCode == 200) {
+                            // If token recieved from server
+                            // Add token to token map
+                            tokenMap[nameController.text] =
+                                jsonDecode(value.body)['access'];
+                            // Add username and password to password map
+                            passwordMap[nameController.text] =
+                                passwordController.text;
+                            // Add type to type map
+                            typeMap[nameController.text] =
+                                jsonDecode(value.body)['type'];
+                            // Add user to server
+                            if (typeMap[nameController.text] == 1) {
+                              addOrgToServer(getToken(nameController.text));
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) => OrganizationApp(
+                                            token:
+                                                getToken(nameController.text),
+                                            hosturl: hosturl,
+                                          )));
+                            } else if (typeMap[nameController.text] == 2) {
+                              addDonToServer(getToken(nameController.text));
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) => DonorApp(
+                                            token:
+                                                getToken(nameController.text),
+                                            hosturl: hosturl,
+                                          )));
+                            } else if (typeMap[nameController.text] == 3) {
+                              addMemToServer(getToken(nameController.text));
+                              Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) => MemberApp(
+                                            token:
+                                                getToken(nameController.text),
+                                            hosturl: hosturl,
+                                          )));
+                            }
+                          } else {
+                            // Show error message
+                            showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return AlertDialog(
+                                    title: const Text("Error"),
+                                    content: const Text(
+                                        "Invalid username or password. Please try again."),
+                                    actions: [
+                                      TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                          child: const Text("Close"))
+                                    ],
+                                  );
+                                });
+                          }
+                        });
+                      }
+                    }),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  const Text('Does not have account?'),
+                  TextButton(
+                    child: const Text(
+                      'Sign in',
+                      style: TextStyle(fontSize: 20),
+                    ),
+                    onPressed: () {
+                      //signup screen
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => SignInPage(
+                                    hosturl: hosturl,
+                                  )));
+                    },
+                  )
+                ],
+              ),
+            ],
+          )),
+    );
+  }
+}
+
+class SignInPage extends StatefulWidget {
+  const SignInPage({Key? key, required this.hosturl}) : super(key: key);
+  final String hosturl;
+
+  @override
+  SignInPageState createState() => SignInPageState();
+}
+
+class SignInPageState extends State<SignInPage> {
+  final TextEditingController _firstNameController =
+      TextEditingController(); // First name
+  final TextEditingController _lastNameController =
+      TextEditingController(); // Last name
+  final TextEditingController _usernameController =
+      TextEditingController(); // Username
+  final TextEditingController _passwordController =
+      TextEditingController(); // Password
+
+  // Send the sign up request to the server
+  Future<http.Response> signUp(String firstName, String lastName,
+      String username, String password) async {
+    return http.post(
+        Uri.parse(Platform.isAndroid
+            ? 'http://${widget.hosturl}/signup/'
+            : 'http://${widget.hosturl}/signup/'),
+        headers: <String, String>{
+          'Content-Type': 'application/json; charset=UTF-8',
+        },
+        // Send data from textedit controllers to server
+
+        body: jsonEncode(<String, String>{
+          'first_name': firstName,
+          'last_name': lastName,
+          'username': username,
+          'password': password,
+        }));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text('Sign In'),
       ),
+      // Allign the text fields in the center
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Container(
+                width: 400,
+                padding: const EdgeInsets.all(10),
+                child: TextField(
+                  controller: _firstNameController,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'First Name',
+                  ),
+                ),
+              ),
+              Container(
+                width: 400,
+                padding: const EdgeInsets.all(10),
+                child: TextField(
+                  controller: _lastNameController,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Last Name',
+                  ),
+                ),
+              ),
+              Container(
+                width: 400,
+                padding: const EdgeInsets.all(10),
+                child: TextField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Username',
+                  ),
+                ),
+              ),
+              Container(
+                width: 400,
+                padding: const EdgeInsets.all(10),
+                child: TextField(
+                  controller: _passwordController,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Password',
+                  ),
+                  obscureText: true,
+                ),
+              ),
+              SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () {
+                    // Send sign up request to server
+                    signUp(_firstNameController.text, _lastNameController.text,
+                        _usernameController.text, _passwordController.text);
+                  },
+                  child: const Text('Sign In'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
